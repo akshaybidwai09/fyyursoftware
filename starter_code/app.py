@@ -28,23 +28,6 @@ migrate = Migrate(app,db)
 # Models.
 #----------------------------------------------------------------------------#
 
-class Genre(db.Model):
-    __tablename__ = 'Genre'
-
-    id = db.Column(db.Integer, primary_key=True)
-    name = db.Column(db.String)
-
-artist_genre_table = db.Table('artist_genre_table',
-    db.Column('genre_id', db.Integer, db.ForeignKey('Genre.id'), primary_key=True),
-    db.Column('artist_id', db.Integer, db.ForeignKey('Artist.id'), primary_key=True)
-)
-
-venue_genre_table = db.Table('venue_genre_table',
-    db.Column('genre_id', db.Integer, db.ForeignKey('Genre.id'), primary_key=True),
-    db.Column('venue_id', db.Integer, db.ForeignKey('Venue.id'), primary_key=True)
-)
-    
-    
 # Venue is the parent (one-to-many) of a Show (Artist is also a foreign key, in def. of Show)
 class Venue(db.Model):
     __tablename__ = 'Venue'
@@ -55,17 +38,15 @@ class Venue(db.Model):
     state = db.Column(db.String(120))
     address = db.Column(db.String(120))
     phone = db.Column(db.String(120))
+    genres = db.Column(db.ARRAY(db.String(120)))
     image_link = db.Column(db.String(500))
     facebook_link = db.Column(db.String(120))
-
-    # TODO: implement any missing fields, as a database migration using Flask-Migrate
-    genres = db.relationship('Genre', secondary=venue_genre_table, backref=db.backref('venues'))
-
     website = db.Column(db.String(120))
     seeking_talent = db.Column(db.Boolean, default=False)
     seeking_description = db.Column(db.String(120))
 
-    shows = db.relationship('Show', backref='venue', lazy=True)
+
+    shows = db.relationship('Show', backref='Venue', lazy=True)
 
     def __repr__(self):
         return f'<Venue {self.id} {self.name}>'
@@ -79,18 +60,14 @@ class Artist(db.Model):
     city = db.Column(db.String(120))
     state = db.Column(db.String(120))
     phone = db.Column(db.String(120))
-    genres = db.Column(db.String(120))
+    genres = db.Column(db.ARRAY(db.String(120)))
     image_link = db.Column(db.String(500))
     facebook_link = db.Column(db.String(120))
-
-    # TODO: implement any missing fields, as a database migration using Flask-Migrate
-    genres = db.relationship('Genre', secondary=artist_genre_table, backref=db.backref('artists'))
-
-    website = db.Column(db.String(120))
+    website_link = db.Column(db.String(120))
     seeking_venue = db.Column(db.Boolean, default=False)
     seeking_description = db.Column(db.String(120))
 
-    shows = db.relationship('Show', backref='artist', lazy=True)   
+    shows = db.relationship('Show', backref='Artist', lazy=True)   
 
     def __repr__(self):
         return f'<Artist {self.id} {self.name}>'
@@ -271,9 +248,32 @@ def create_venue_form():
 
 @app.route('/venues/create', methods=['POST'])
 def create_venue_submission():
-  # TODO: insert form data as a new Venue record in the db, instead
-  # TODO: modify data to be the data object returned from db insertion
-  return render_template('pages/home.html')
+  form = VenueForm(request.form)
+  try:
+    venues = Venue(
+      name = form.name.data,
+      city = form.city.data,
+      state = form.state.data,
+      address = form.address.data,
+      phone = form.phone.data,
+      genres = form.genres.data,
+      facebook_link = form.facebook_link.data,
+      image_link = form.image_link.data,
+      website_link = form.website_link.data,
+      seeking_talent = form.seeking_talent.data,
+      seeking_description = form.seeking_description.data
+    )
+    db.session.add(venues)
+    db.session.commit()
+    flash('Venue ' + request.form['name'] + ' was successfully listed!')
+  except:
+    db.session.rollback()
+    print(sys.exc_info())
+    flash('Venue ' + request.form['name'] + ' was not listed')
+  finally:
+    db.session.close()  
+  return redirect(url_for('index'))
+
 
   # on successful db insert, flash success
   # TODO: on unsuccessful db insert, flash an error instead.
@@ -464,16 +464,30 @@ def create_artist_form():
 
 @app.route('/artists/create', methods=['POST'])
 def create_artist_submission():
-  # called upon submitting the new artist listing form
-  # TODO: insert form data as a new Venue record in the db, instead
-  # TODO: modify data to be the data object returned from db insertion
-
-  # on successful db insert, flash success
-  flash('Artist ' + request.form['name'] + ' was successfully listed!')
-  # TODO: on unsuccessful db insert, flash an error instead.
-  # e.g., flash('An error occurred. Artist ' + data.name + ' could not be listed.')
-  return render_template('pages/home.html')
-
+  form = ArtistForm()
+  try:
+    artists = Artist(
+    name = form.name.data,
+    city = form.city.data,
+    state = form.state.data,
+    phone = form.phone.data,
+    genres = form.genres.data,
+    facebook_link = form.facebook_link.data,
+    image_link = form.image_link.data,
+    website_link = form.website_link.data,
+    seeking_venue = form.seeking_venue.data,
+    seeking_description = form.seeking_description.data
+  )
+    db.session.add(artists)
+    db.session.commit()
+    flash('Artist ' + request.form['name'] + ' was successfully listed!')
+  except:
+    db.session.rollback()
+    print(sys.exc_info())
+    flash('Artist ' + request.form['name'] + ' was not listed')
+  finally:
+    db.session.close()  
+  return redirect(url_for('index'))
 
 #  Shows
 #  ----------------------------------------------------------------
@@ -529,10 +543,11 @@ def create_shows():
 
 @app.route('/shows/create', methods=['POST'])
 def create_show_submission():
-  form = ShowForm()
+  
+  form = ShowForm(request.form)
 
-  artist_id = form.artist_id.data.strip()
-  venue_id = form.venue_id.data.strip()
+  artist_id = form.artist_id.data
+  venue_id = form.venue_id.data
   start_time = form.start_time.data
 
   error_in_insert = False
@@ -541,10 +556,11 @@ def create_show_submission():
     new_show = Show(start_time=start_time, artist_id=artist_id, venue_id=venue_id)
     db.session.add(new_show)
     db.session.commit()
-  except:
+  except ValueError as e:
     error_in_insert = True
     print(sys.exc_info())
     db.session.rollback()
+    flash('An error occurred. Show could not be listed.')
   finally:
     db.session.close()
 
