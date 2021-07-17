@@ -137,11 +137,9 @@ def search_venues():
   venue = db.session.query(Venue).filter(Venue.name.ilike('%' + request.form['search_term'] + '%'))
   data = []
   for venues in venue:
-    num_upcoming_shows = Show.query.filter(Show.venue_id == Venue.id, Show.start_time > datetime.now()).count()
     data.append({
       "id": venues.id,
-      "name": venues.name,
-      "num_upcoming_shows": num_upcoming_shows
+      "name": venues.name
     })
   response={
     "count": len(data), 
@@ -156,20 +154,6 @@ def show_venue(venue_id):
   # TODO: replace with real venue data from the venues table, using venue_id
   venue = Venue.query.get(venue_id)
   list_shows = db.session.query(Show).filter(Show.venue_id == venue_id)
-  past_shows = []
-  upcoming_shows = []
-  for show in list_shows:
-    artist = db.session.query(Artist.name, Artist.image_link).filter(Artist.id == show.artist_id).one()
-    show_add = {
-        "artist_id": show.artist_id,
-        "artist_name": artist.name,
-        "artist_image_link": artist.image_link,
-        "start_time": show.start_time.strftime('%m/%d/%Y')
-        }
-    if (show.start_time < datetime.now()):
-        past_shows.append(show_add)
-    else:
-        upcoming_shows.append(show_add)
   data = {
     "id": venue.id,
     "name": venue.name,
@@ -182,11 +166,7 @@ def show_venue(venue_id):
     "facebook_link": venue.facebook_link,
     "seeking_talent": venue.seeking_talent,
     "seeking_description": venue.seeking_description,
-    "image_link": venue.image_link,
-    "past_shows": past_shows,
-    "upcoming_shows": upcoming_shows,
-    "past_shows_count": len(past_shows),
-    "upcoming_shows_count": len(upcoming_shows),
+    "image_link": venue.image_link
   }
   return render_template('pages/show_venue.html', venue=data)
 
@@ -219,7 +199,7 @@ def create_venue_submission():
     db.session.add(venues)
     db.session.commit()
     flash('Venue ' + request.form['name'] + ' was successfully listed!')
-  except:
+  except ValueError as e:
     db.session.rollback()
     print(sys.exc_info())
     flash('Venue ' + request.form['name'] + ' was not listed')
@@ -240,10 +220,10 @@ def delete_venue(venue_id):
     venue = Venue.query.get_or_404(venue_id)
     db.session.delete(venue)
     db.session.commit()
-    flash('Venue ' + venue.name + ' was successfully deleted')
-  except:
+    flash('Venue ' + venue.name + ' was successfully deleted!!')
+  except ValueError as e:
     db.session.rollback()
-    flash('Venue ' + venue.name + ' was not deleted')
+    flash('Venue ' + venue.name + ' had a problem and bot been deleted')
   finally:
     db.session.close()
   return redirect(url_for('index'))
@@ -259,15 +239,15 @@ def edit_venue(venue_id):
 def edit_venue_submission(venue_id):
   # TODO: take values from the form submitted, and update existing
   # venue record with ID <venue_id> using the new attributes
-  venue = Venue.query.get(venue_id)
-  form = VenueForm(request.form, obj=venue)
+  specificVenue = Venue.query.get(venue_id)
+  form = VenueForm(request.form, obj=specificVenue)
   try:
-    form.populate_obj(venue)
+    form.populate_obj(specificVenue)
     db.session.commit()
-    flash("Venue is successfully edited")
-  except:
+    flash("Venue is successfully edited!!!")
+  except ValueError as e:
     db.session.rollback()
-    flash("An error occurred!")
+    flash("An error occurred! please contact developer for more information")
   return redirect(url_for('show_venue', venue_id=venue_id))
 
 ################################################################################################################################################
@@ -291,11 +271,9 @@ def search_artists():
   artist = db.session.query(Artist).filter(Artist.name.ilike('%' + request.form['search_term'] + '%'))
   data = []
   for artists in artist:
-    num_upcoming_shows = Show.query.filter(Show.artist_id == Artist.id, Show.start_time > datetime.now()).count()
     data.append({
       "id": artists.id,
-      "name": artists.name,
-      "num_upcoming_shows": num_upcoming_shows
+      "name": artists.name
     })
   response={
     "count": len(data),
@@ -307,8 +285,6 @@ def search_artists():
 def show_artist(artist_id):
   artist = Artist.query.get(artist_id)
   list_shows = db.session.query(Show).filter(Show.artist_id == artist_id)
-  past_shows = []
-  upcoming_shows = []
   for show in list_shows:
     venue = db.session.query(Venue.name, Venue.image_link).filter(Venue.id == show.venue_id).one()
     show_add = {
@@ -317,11 +293,6 @@ def show_artist(artist_id):
       "venue_image_link": venue.image_link,
       "start_time": show.start_time.strftime('%m/%d/%Y')
     }
-    if (show.start_time < datetime.now()):
-      past_shows.append(show_add)
-    else:
-      print(show_add, file=sys.stderr)
-      upcoming_shows.append(show_add)
   data = {
     "id": artist.id,
     "name": artist.name,
@@ -333,11 +304,7 @@ def show_artist(artist_id):
     "facebook_link": artist.facebook_link,
     "seeking_venue": artist.seeking_venue,
     "seeking_description": artist.seeking_description,
-    "image_link": artist.image_link,
-    "past_shows": past_shows,
-    "upcoming_shows": upcoming_shows,
-    "past_shows_count": len(past_shows),
-    "upcoming_shows_count": len(upcoming_shows),
+    "image_link": artist.image_link
   }
   return render_template('pages/show_artist.html', artist=data)
 
@@ -357,7 +324,7 @@ def edit_artist_submission(artist_id):
   try:
     form.populate_obj(artist)
     db.session.commit()
-    flash("Artist is successfully edited")
+    flash("Hurray!! Artist is successfully edited")
   except:
     db.session.rollback()
     flash("An error occurred!")
@@ -390,10 +357,10 @@ def create_artist_submission():
     db.session.add(artists)
     db.session.commit()
     flash('Artist ' + request.form['name'] + ' was successfully listed!')
-  except:
+  except ValueError as e:
     db.session.rollback()
     print(sys.exc_info())
-    flash('Artist ' + request.form['name'] + ' was not listed')
+    flash('Artist ' + request.form['name'] + ' was not listed please contact developer team!!')
   finally:
     db.session.close()  
   return redirect(url_for('index'))
