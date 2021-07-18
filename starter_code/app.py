@@ -317,12 +317,8 @@ def shows():
   # TODO: replace with real venues data.
   #       num_shows should be aggregated based on number of upcoming shows per venue.
   shows = Show.query.all()
-  for show in shows:
-    show_query= db.session.query(Show, Artist, Venue).filter_by(Show.id == show.id).join(Artist,Artist.id== Show.artist_id).join(Venue,Venue.id == Show.venue_id)
-
-  results = show_query.all()
   data = []
-  for show in results:
+  for show in shows:
     data.append({
       "venue_id": show.venue_id,
       "venue_name": show.Venue.name,
